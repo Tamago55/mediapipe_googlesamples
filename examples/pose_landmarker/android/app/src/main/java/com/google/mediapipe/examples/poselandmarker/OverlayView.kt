@@ -55,6 +55,39 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         }
     }
 
+    private fun drawDottedLine(canvas: Canvas, startX: Float, startY: Float, endX: Float, color: Int, thickness: Float) {
+        val spaceLength = 5f
+        val dotLength = 15f
+        val totalLength = abs(endX - startX)
+        val numDots = (totalLength / (dotLength + spaceLength)).toInt()
+
+        pointPaint.apply {
+            this.color = Color.WHITE
+            strokeWidth = thickness
+            style = Paint.Style.FILL
+        }
+
+        val radius = thickness / 2
+        canvas.drawCircle(startX, startY, radius, pointPaint)
+        canvas.drawCircle(endX, startY, radius, pointPaint)
+
+
+        for (i in 0 until numDots) {
+            val dotStartX = startX + i * (dotLength + spaceLength)
+            val dotStartY = startY
+            val dotEndX = dotStartX + dotLength
+            val dotEndY = startY
+
+            linePaint.apply {
+                style = Paint.Style.STROKE
+                strokeWidth = thickness
+                this.color = color
+            }
+
+            canvas.drawLine(dotStartX, dotStartY, dotEndX, dotEndY, linePaint)
+        }
+    }
+
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
         results?.let { poseLandmarkerResult ->
@@ -70,18 +103,10 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 Pair(25, 26)  // knee connection
             )
 
-            // Draw mirrored points for these landmarks
-            indices.forEach { index ->
-                val landmark = landmarks[index]
-                canvas.drawPoint(
-                    (1 - landmark.x()) * imageWidth * scaleFactor, // Mirroring the x-coordinate
-                    landmark.y() * imageHeight * scaleFactor,
-                    pointPaint
-                )
-            }
+            // Prepare to store point colors based on connection analysis
+            val pointColors = mutableMapOf<Int, Int>()
 
-
-            // Draw connections and angles
+            // Process each connection to determine colors
             connections.forEach { (start, end) ->
                 val startLandmark = landmarks[start]
                 val endLandmark = landmarks[end]
@@ -90,22 +115,62 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 val endX = (1 - endLandmark.x()) * imageWidth * scaleFactor
                 val endY = endLandmark.y() * imageHeight * scaleFactor
 
-                // Drawing the line
-                canvas.drawLine(startX, startY, endX, endY, linePaint)
-
-                // Calculating and displaying angle
+                // Calculating the angle
                 val angle = calculateAngle(startX, startY, endX, endY)
                 val midX = (startX + endX) / 2
-                val midY = (startY + endY) / 2
-                canvas.drawText("${angle.toInt()}°", midX, midY, textPaint)
+                val midY = (startY + endY) / 2 - 100
+
+//                // Decide color based on angle deviation
+//                val color = if (abs(angle) > 2) Color.RED else Color.GREEN
+//                linePaint.color = color
+//                pointColors[start] = color
+//                pointColors[end] = color
+                if (angle < -2) {
+                    // Angle exceeds threshold
+                    drawDottedLine(canvas, startX, startY, endX, Color.WHITE, 10f)
+                    linePaint.color = Color.RED
+                    pointColors[start] = Color.RED
+                    pointColors[end] = Color.RED
+                } else if (angle > 2){
+                    drawDottedLine(canvas, startX, endY, endX, Color.WHITE, 10f)
+                    linePaint.color = Color.RED
+                    pointColors[start] = Color.RED
+                    pointColors[end] = Color.RED
+                } else {
+                    // Below threshold
+                    linePaint.color = Color.GREEN
+                    pointColors[start] = Color.GREEN
+                    pointColors[end] = Color.GREEN
+                }
+
+
+                // Draw the line
+                canvas.drawLine(startX, startY, endX, endY, linePaint)
+                canvas.drawText(String.format("%.2f°", abs(angle)), midX, midY, textPaint)
+            }
+
+            // Draw mirrored points for landmarks using determined colors
+            indices.forEach { index ->
+                val landmark = landmarks[index]
+                pointPaint.color = pointColors.getOrElse(index) { Color.GREEN } // Default to green if not set
+                canvas.drawPoint(
+                    (1 - landmark.x()) * imageWidth * scaleFactor,
+                    landmark.y() * imageHeight * scaleFactor,
+                    pointPaint
+                )
             }
         }
     }
 
+
     // Function to calculate the angle between two points
     private fun calculateAngle(x1: Float, y1: Float, x2: Float, y2: Float): Double {
-        val angle = atan2(y2 - y1, x2 - x1) * (180 / PI)
-        return if (angle < 0) angle + 360 else angle
+        var angle = atan2(y2 - y1, x2 - x1) * (180 / PI)
+        angle = (angle + 360) % 360
+        if (angle > 180) {
+            angle -= 360
+        }
+        return angle
     }
 
     fun setResults(
@@ -131,85 +196,4 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         invalidate()
     }
 
-//    companion object {
-//        private const val LANDMARK_STROKE_WIDTH = 12F
-//    }
 }
-
-
-
-
-//    private fun initPaints() {
-//        linePaint.color =
-//            ContextCompat.getColor(context!!, R.color.mp_color_primary)
-//        linePaint.strokeWidth = LANDMARK_STROKE_WIDTH
-//        linePaint.style = Paint.Style.STROKE
-//
-//        pointPaint.color = Color.YELLOW
-//        pointPaint.strokeWidth = LANDMARK_STROKE_WIDTH
-//        pointPaint.style = Paint.Style.FILL
-//    }
-
-//    override fun draw(canvas: Canvas) {
-//        super.draw(canvas)
-//        results?.let { poseLandmarkerResult ->
-//            for(landmark in poseLandmarkerResult.landmarks()) {
-//                for(normalizedLandmark in landmark) {
-//                    canvas.drawPoint(
-//                        normalizedLandmark.x() * imageWidth * scaleFactor,
-//                        normalizedLandmark.y() * imageHeight * scaleFactor,
-//                        pointPaint
-//                    )
-//                }
-//
-//                PoseLandmarker.POSE_LANDMARKS.forEach {
-//                    canvas.drawLine(
-//                        poseLandmarkerResult.landmarks().get(0).get(it!!.start()).x() * imageWidth * scaleFactor,
-//                        poseLandmarkerResult.landmarks().get(0).get(it.start()).y() * imageHeight * scaleFactor,
-//                        poseLandmarkerResult.landmarks().get(0).get(it.end()).x() * imageWidth * scaleFactor,
-//                        poseLandmarkerResult.landmarks().get(0).get(it.end()).y() * imageHeight * scaleFactor,
-//                        linePaint)
-//                }
-//            }
-//        }
-//    }
-
-//    override fun draw(canvas: Canvas) {
-//        super.draw(canvas)
-//        results?.let { poseLandmarkerResult ->
-//            val landmarks = poseLandmarkerResult.landmarks().first()
-//
-//            // Define the indices for shoulders, hips, and knees
-//            val indices = listOf(11, 12, 23, 24, 25, 26)
-//
-//            // Draw points for these landmarks
-//            indices.forEach { index ->
-//                val landmark = landmarks[index]
-//                canvas.drawPoint(
-//                    landmark.x() * imageWidth * scaleFactor,
-//                    landmark.y() * imageHeight * scaleFactor,
-//                    pointPaint
-//                )
-//            }
-//
-//            // Define connections between points
-//            val connections = listOf(
-//                Pair(11, 12), // shoulder
-//                Pair(23, 24), // hip
-//                Pair(25, 26) // knee
-//            )
-//
-//            // Draw lines for these connections
-//            connections.forEach { (start, end) ->
-//                val startLandmark = landmarks[start]
-//                val endLandmark = landmarks[end]
-//                canvas.drawLine(
-//                    startLandmark.x() * imageWidth * scaleFactor,
-//                    startLandmark.y() * imageHeight * scaleFactor,
-//                    endLandmark.x() * imageWidth * scaleFactor,
-//                    endLandmark.y() * imageHeight * scaleFactor,
-//                    linePaint
-//                )
-//            }
-//        }
-//    }
