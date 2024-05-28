@@ -55,22 +55,23 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         }
     }
 
-    private fun drawDottedLine(canvas: Canvas, startX: Float, startY: Float, endX: Float, color: Int, thickness: Float) {
+    private fun drawDottedLine(canvas: Canvas, startX: Float, startY: Float, endX: Float, color: Int, thickness: Float, angle: Double) {
         val spaceLength = 5f
         val dotLength = 15f
         val totalLength = abs(endX - startX)
         val numDots = (totalLength / (dotLength + spaceLength)).toInt()
 
         pointPaint.apply {
-            this.color = Color.WHITE
-            strokeWidth = thickness
+            this.color = Color.YELLOW
+            strokeWidth = 30f
             style = Paint.Style.FILL
         }
-
-        val radius = thickness / 2
-        canvas.drawCircle(startX, startY, radius, pointPaint)
-        canvas.drawCircle(endX, startY, radius, pointPaint)
-
+        val radius = 20f
+        if (angle < -2) {
+            canvas.drawCircle(endX, startY, radius, pointPaint)
+        } else if (angle > 2){
+            canvas.drawCircle(startX, startY, radius, pointPaint)
+        }
 
         for (i in 0 until numDots) {
             val dotStartX = startX + i * (dotLength + spaceLength)
@@ -121,18 +122,13 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 val midY = (startY + endY) / 2 - 100
 
 //                // Decide color based on angle deviation
-//                val color = if (abs(angle) > 2) Color.RED else Color.GREEN
-//                linePaint.color = color
-//                pointColors[start] = color
-//                pointColors[end] = color
                 if (angle < -2) {
-                    // Angle exceeds threshold
-                    drawDottedLine(canvas, startX, startY, endX, Color.WHITE, 10f)
+                    drawDottedLine(canvas, startX, startY, endX, Color.YELLOW, 10f, angle)
                     linePaint.color = Color.RED
                     pointColors[start] = Color.RED
                     pointColors[end] = Color.RED
                 } else if (angle > 2){
-                    drawDottedLine(canvas, startX, endY, endX, Color.WHITE, 10f)
+                    drawDottedLine(canvas, startX, endY, endX, Color.YELLOW, 10f, angle)
                     linePaint.color = Color.RED
                     pointColors[start] = Color.RED
                     pointColors[end] = Color.RED
@@ -142,7 +138,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                     pointColors[start] = Color.GREEN
                     pointColors[end] = Color.GREEN
                 }
-
 
                 // Draw the line
                 canvas.drawLine(startX, startY, endX, endY, linePaint)
